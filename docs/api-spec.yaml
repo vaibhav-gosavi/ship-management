@@ -1,0 +1,483 @@
+# OpenAPI specification for the API
+openapi: 3.0.0
+info:
+  title: Ship Management System API
+  description: API documentation for the Ship Management System.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5001
+    description: Local development server
+
+paths:
+  /api/v1/routes/addroute:
+    post:
+      summary: Add a new route
+      description: Creates a new shipping route for a specific ship.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddRouteRequest'
+      responses:
+        201:
+          description: Route created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Route'
+        400:
+          description: Invalid input data.
+        500:
+          description: Server error.
+
+  /api/v1/routes/ship:
+    post:
+      summary: Add a new ship
+      description: Registers a new ship in the system.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddShipRequest'
+      responses:
+        201:
+          description: Ship created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ship'
+        400:
+          description: Invalid input data.
+        500:
+          description: Server error.
+
+  /api/v1/routes/{id}/complete:
+    put:
+      summary: Complete a route
+      description: Marks a route as completed and updates its actual duration.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the route to complete.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteRouteRequest'
+      responses:
+        200:
+          description: Route updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Route'
+        404:
+          description: Route not found.
+        500:
+          description: Server error.
+
+  /api/v1/fuel/logs:
+    post:
+      summary: Add a fuel log
+      description: Records a new fuel log for a specific ship and route.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddFuelLogRequest'
+      responses:
+        201:
+          description: Fuel log created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FuelLog'
+        400:
+          description: Invalid input data.
+        500:
+          description: Server error.
+
+  /api/v1/fuel/estimate:
+    get:
+      summary: Get fuel consumption estimate
+      description: Predicts the fuel consumption for a given route and ship.
+      parameters:
+        - name: shipId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: distance
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: cargoWeight
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: estimatedDuration
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: departureLat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: departureLon
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: Predicted fuel consumption.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictedFuel:
+                    type: number
+        400:
+          description: Invalid query parameters.
+        500:
+          description: Server error.
+
+  /api/v1/maintenance:
+    post:
+      summary: Add a maintenance record
+      description: Records a new maintenance activity for a ship.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMaintenanceRequest'
+      responses:
+        201:
+          description: Maintenance record created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Maintenance'
+        400:
+          description: Invalid input data.
+        500:
+          description: Server error.
+
+  /api/v1/maintenance/schedule:
+    get:
+      summary: Get maintenance schedule
+      description: Predicts the next maintenance schedule for a ship.
+      parameters:
+        - name: shipId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Predicted maintenance schedule.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictedRULHours:
+                    type: number
+        400:
+          description: Invalid query parameters.
+        500:
+          description: Server error.
+
+  /api/v1/admin/trigger-training:
+    post:
+      summary: Trigger model training
+      description: Manually triggers the training of fuel and maintenance models.
+      responses:
+        202:
+          description: Training jobs added to the queue.
+        500:
+          description: Server error.
+
+  /api/v1/analytics/get-analytics:
+    get:
+      summary: Get analytics
+      description: Fetches analytics insights on route efficiency and fuel trends.
+      responses:
+        200:
+          description: Analytics data fetched successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+        404:
+          description: No analytics data available.
+        500:
+          description: Server error.
+
+components:
+  schemas:
+    AddRouteRequest:
+      type: object
+      properties:
+        shipId:
+          type: string
+        departure:
+          type: object
+          properties:
+            port:
+              type: string
+            timestamp:
+              type: string
+              format: date-time
+            coordinates:
+              type: object
+              properties:
+                lat:
+                  type: number
+                lng:
+                  type: number
+        destination:
+          type: object
+          properties:
+            port:
+              type: string
+            estimatedTimestamp:
+              type: string
+              format: date-time
+            coordinates:
+              type: object
+              properties:
+                lat:
+                  type: number
+                lng:
+                  type: number
+        distance:
+          type: number
+        status:
+          type: string
+        cargoWeight:
+          type: number
+        estimatedDuration:
+          type: number
+    AddShipRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        imoNumber:
+          type: string
+        type:
+          type: string
+        buildYear:
+          type: number
+        capacity:
+          type: object
+          properties:
+            weight:
+              type: number
+            volume:
+              type: number
+        engine:
+          type: object
+          properties:
+            type:
+              type: string
+            power:
+              type: number
+            fuelType:
+              type: string
+        dimensions:
+          type: object
+          properties:
+            length:
+              type: number
+            width:
+              type: number
+            draft:
+              type: number
+    CompleteRouteRequest:
+      type: object
+      properties:
+        actualDuration:
+          type: number
+        weatherConditions:
+          type: object
+          properties:
+            averageWindSpeed:
+              type: number
+            averageWaveHeight:
+              type: number
+            predominantDirection:
+              type: string
+    AddFuelLogRequest:
+      type: object
+      properties:
+        shipId:
+          type: string
+        routeId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        fuelType:
+          type: string
+        quantity:
+          type: number
+        consumptionRate:
+          type: number
+        engineHours:
+          type: number
+        rpm:
+          type: number
+        speed:
+          type: number
+        weatherConditions:
+          type: object
+          properties:
+            windSpeed:
+              type: number
+            waveHeight:
+              type: number
+            temperature:
+              type: number
+        notes:
+          type: string
+    AddMaintenanceRequest:
+      type: object
+      properties:
+        shipId:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        performedAt:
+          type: string
+          format: date-time
+        engineHoursAtMaintenance:
+          type: number
+        partsReplaced:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              serialNumber:
+                type: string
+              lifeExpectancy:
+                type: number
+        cost:
+          type: number
+        technician:
+          type: string
+    Route:
+      type: object
+      properties:
+        id:
+          type: string
+        shipId:
+          type: string
+        departure:
+          type: object
+        destination:
+          type: object
+        distance:
+          type: number
+        status:
+          type: string
+        cargoWeight:
+          type: number
+        estimatedDuration:
+          type: number
+        actualDuration:
+          type: number
+    Ship:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        imoNumber:
+          type: string
+        type:
+          type: string
+        buildYear:
+          type: number
+        capacity:
+          type: object
+        engine:
+          type: object
+        dimensions:
+          type: object
+    FuelLog:
+      type: object
+      properties:
+        id:
+          type: string
+        shipId:
+          type: string
+        routeId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        fuelType:
+          type: string
+        quantity:
+          type: number
+        consumptionRate:
+          type: number
+        engineHours:
+          type: number
+        rpm:
+          type: number
+        speed:
+          type: number
+        weatherConditions:
+          type: object
+        notes:
+          type: string
+    Maintenance:
+      type: object
+      properties:
+        id:
+          type: string
+        shipId:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        performedAt:
+          type: string
+          format: date-time
+        engineHoursAtMaintenance:
+          type: number
+        partsReplaced:
+          type: array
+          items:
+            type: object
+        cost:
+          type: number
+        technician:
+          type: string

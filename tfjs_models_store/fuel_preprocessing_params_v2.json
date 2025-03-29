@@ -1,0 +1,80 @@
+{
+  "numericalFeatures": [
+    "ship_buildYear",
+    "ship_capacity_weight",
+    "ship_engine_power",
+    "ship_length",
+    "route_distance",
+    "route_cargoWeight",
+    "route_actual_duration_hours",
+    "weather_wind_speed",
+    "weather_temp"
+  ],
+  "categoricalFeatures": [
+    "ship_type"
+  ],
+  "targetVariable": "target_fuel_consumed",
+  "imputation": {
+    "ship_buildYear": 2014,
+    "ship_capacity_weight": 29039,
+    "ship_engine_power": 21969,
+    "ship_length": 228,
+    "route_distance": 5852.5,
+    "route_cargoWeight": 23777,
+    "route_actual_duration_hours": 442.5,
+    "weather_wind_speed": 10.2731944,
+    "weather_temp": 2.7350000000000003
+  },
+  "scalers": {
+    "ship_buildYear": {
+      "mean": 2012.5869565217392,
+      "stdDev": 6.326535170136911
+    },
+    "ship_capacity_weight": {
+      "mean": 27876.91304347826,
+      "stdDev": 10691.225680793383
+    },
+    "ship_engine_power": {
+      "mean": 22031.5,
+      "stdDev": 5306.286881369241
+    },
+    "ship_length": {
+      "mean": 208.15217391304347,
+      "stdDev": 56.61731467811821
+    },
+    "route_distance": {
+      "mean": 5911.5,
+      "stdDev": 2592.6197825667614
+    },
+    "route_cargoWeight": {
+      "mean": 24914.978260869564,
+      "stdDev": 9204.493301334409
+    },
+    "route_actual_duration_hours": {
+      "mean": 424.5217391304348,
+      "stdDev": 204.07093173596314
+    },
+    "weather_wind_speed": {
+      "mean": 11.275962295652175,
+      "stdDev": 7.314545219864898
+    },
+    "weather_temp": {
+      "mean": -1.8732608695652178,
+      "stdDev": 25.307787515544437
+    }
+  },
+  "encoders": {
+    "ship_type": {
+      "categories": [
+        "Bulk Carrier",
+        "Cargo",
+        "Tanker"
+      ],
+      "mapping": {
+        "Bulk Carrier": 0,
+        "Cargo": 1,
+        "Tanker": 2
+      }
+    }
+  }
+}

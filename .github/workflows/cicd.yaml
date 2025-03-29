@@ -1,0 +1,60 @@
+name: Deploy to Google Cloud
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout source code
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      # Step 2: Authenticate with Google Cloud
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Step 3: Set up Cloud SDK
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      # Step 4: Authenticate Docker for Artifact Registry
+      - name: Authenticate Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
+
+      # Step 5: Clean up old Docker images from Artifact Registry
+      - name: Clean up old Docker images
+        run: |
+          gcloud artifacts docker images delete us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ship-management-system/ship-management-system --quiet --delete-tags || true
+
+      # Step 6: Delete previous Cloud Run revisions
+      - name: Delete old Cloud Run revisions
+        run: |
+          revisions=$(gcloud run revisions list --service ship-management-system --region us-central1 --format="value(metadata.name)")
+          for rev in $revisions; do
+            gcloud run revisions delete $rev --region us-central1 --quiet || true
+          done
+
+      # Step 7: Build and push Docker image to Artifact Registry
+      - name: Build and Push Docker Image
+        run: |
+          docker buildx build --platform linux/amd64 --no-cache -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ship-management-system/ship-management-system:latest .
+          docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ship-management-system/ship-management-system:latest
+
+      # Step 8: Deploy to Google Cloud Run
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ship-management-system \
+            --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ship-management-system/ship-management-system:latest \
+            --region us-central1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --timeout 3510 \
+            --set-env-vars "MONGO_URI=${{ secrets.SECRETS_MONGO_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},OPENWEATHERMAP_API_KEY=${{ secrets.OPENWEATHERMAP_API_KEY }},HISTORICAL_DATA_ENABLED=${{ secrets.HISTORICAL_DATA_ENABLED }},PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}"

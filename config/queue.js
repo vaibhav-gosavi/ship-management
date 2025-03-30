@@ -31,9 +31,8 @@ export const modelTrainingQueue = new Queue('model-training', {
 setupQueueListeners('model-training', modelTrainingQueue);
 
 
-// --- Your existing queues (converted to BullMQ) ---
 
-// 2. Fuel Prediction Queue (If used elsewhere, keep; otherwise, maybe remove if only training is backgrounded)
+// 2. Fuel Prediction Queue 
 // Note: Real-time prediction usually happens in the API request, not a queue.
 // This queue might be intended for something else? Let's keep it for now.
 export const fuelPredictionQueue = new Queue('fuel-prediction', {
@@ -48,37 +47,30 @@ export const fuelPredictionQueue = new Queue('fuel-prediction', {
 });
 setupQueueListeners('fuel-prediction', fuelPredictionQueue);
 
-// 3. Route Optimization Queue (If used for complex route planning)
-export const routeOptimizationQueue = new Queue('route-optimization', {
-    connection: redisConfig, // Use connection object
-    // BullMQ limiter syntax is slightly different if needed, but the concept exists.
-    // Let's keep the options simple for now unless specific rate limiting is required *here*.
-    defaultJobOptions: {
-         attempts: 1 // Optimization might not be retryable easily
-    }
-    // If you need BullMQ rate limiting: https://docs.bullmq.io/guide/rate-limiting
-});
-setupQueueListeners('route-optimization', routeOptimizationQueue);
+// // 3. Route Optimization Queue (If used for complex route planning)
+// export const routeOptimizationQueue = new Queue('route-optimization', {
+//     connection: redisConfig, // Use connection object
+//     // BullMQ limiter syntax is slightly different if needed, but the concept exists.
+//     // Let's keep the options simple for now unless specific rate limiting is required *here*.
+//     defaultJobOptions: {
+//          attempts: 1 // Optimization might not be retryable easily
+//     }
+//     // If you need BullMQ rate limiting: https://docs.bullmq.io/guide/rate-limiting
+// });
+// setupQueueListeners('route-optimization', routeOptimizationQueue);
 
 
 // --- Remove Old Bull Listeners ---
 // Job lifecycle events like 'completed' and 'failed' are best handled
 // by the *Worker* processing the jobs, not globally on the Queue object.
-// Removing these:
-// fuelPredictionQueue.on('completed', ...)
-// fuelPredictionQueue.on('failed', ...)
 
 
-// --- Exports ---
-// Export all queues individually using named exports
-// This allows importing only the specific queue needed, e.g.,
-// import { modelTrainingQueue } from './config/queue.js'; in server.js or worker.js
 
 // The default export is optional if you primarily use named imports
 export default {
   modelTrainingQueue, // Add the new queue here too
   fuelPredictionQueue,
-  routeOptimizationQueue,
+//   routeOptimizationQueue,
 };
 
 logger.info('BullMQ queues initialized.');

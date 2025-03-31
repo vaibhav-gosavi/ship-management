@@ -20,8 +20,14 @@ The Ship Management System is a modular Node.js application built with the follo
 - **AI Models**: TensorFlow.js for predictive analytics and route optimization.
 - **Logger**: Winston-based custom logger for structured logging.
 
-### Architecture Diagram
+### Current Architecture Diagram
 ![Architecture Diagram](https://github.com/vaibhav-gosavi/ship-management/blob/master/Untitled-2024-08-28-0013.png)
+
+### Architecture Diagram which is much more scalable 
+#### reasons in the current one the pipeline is traning in the same server which is a draw back as it would overload the server as the traning datasize increase. 
+#### A better approach would be to offload the traning part to a python based server and we have more option to choose and good support for any package for ML related task in python 
+![Architecture Diagram](https://github.com/vaibhav-gosavi/ship-management/blob/master/Untitled-2024-08-28-0013_2.png)
+
 
 ### Folder Structure
 ```

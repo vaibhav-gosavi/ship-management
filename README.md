@@ -21,7 +21,7 @@ The Ship Management System is a modular Node.js application built with the follo
 - **Logger**: Winston-based custom logger for structured logging.
 
 ### Architecture Diagram
-![Architecture Diagram](d:/Ship%20Management%20System/Untitled-2024-08-28-0013.png)
+![Architecture Diagram](https://github.com/vaibhav-gosavi/ship-management/blob/master/Untitled-2024-08-28-0013.png)
 
 ### Folder Structure
 ```

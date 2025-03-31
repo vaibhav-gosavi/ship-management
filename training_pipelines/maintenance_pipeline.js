@@ -1,4 +1,3 @@
-// training_pipelines/maintenance_pipeline.js
 import mongoose from 'mongoose';
 import fs from 'fs/promises';
 import path from 'path';
@@ -13,8 +12,15 @@ const MODEL_OUTPUT_DIR = path.resolve(process.cwd(), 'tfjs_models_store');
 const MAINTENANCE_MODEL_SAVE_PATH_PREFIX = `file://${path.join(MODEL_OUTPUT_DIR, 'maintenance-model')}`;
 const PREPROCESSING_PARAMS_PATH_PREFIX = path.join(MODEL_OUTPUT_DIR, 'maintenance_preprocessing_params');
 const TEST_SET_RATIO = 0.2;
-const MIN_TRAINING_SAMPLES = 15;
-// --- !! UPDATED: Only training 'Engine Overhaul' based on latest logs !! ---
+// Reduced minimum samples requirement to handle smaller datasets
+const MIN_TRAINING_SAMPLES = 10; // Reduced from 15
+// Regularization parameters
+const L1_REGULARIZATION = 0.001;
+const L2_REGULARIZATION = 0.01;
+// Early stopping configuration
+const EARLY_STOPPING_PATIENCE = 15; // Increased from 10
+const EARLY_STOPPING_MIN_DELTA = 50; // Reduced from 100
+// Target maintenance types
 const TARGET_MAINTENANCE_TYPES = ['Engine Overhaul'];
 // -----------------------------------------------------------------------------
 
@@ -54,6 +60,35 @@ const getScalingParams = (data, column) => {
         mean: meanVal,
         stdDev: (stdDevVal === 0 || isNaN(stdDevVal)) ? 1 : stdDevVal
     };
+};
+
+// --- Data augmentation for small datasets ---
+const augmentData = (data, augmentationFactor = 0.1) => {
+    if (data.length >= 30) return data; // Only augment small datasets
+    
+    const augmentedData = [...data]; // Start with original data
+    const numAugmentations = Math.max(5, Math.ceil(data.length * augmentationFactor));
+    
+    logger.info(`Augmenting dataset with ${numAugmentations} synthetic samples`);
+    
+    for (let i = 0; i < numAugmentations; i++) {
+        // Select a random sample to augment
+        const baseIndex = Math.floor(Math.random() * data.length);
+        const baseSample = {...data[baseIndex]};
+        
+        // Add small random variations to numerical features
+        for (const key in baseSample) {
+            if (typeof baseSample[key] === 'number') {
+                // Add noise between -5% and +5% of original value
+                const noisePercent = (Math.random() * 0.1) - 0.05;
+                baseSample[key] *= (1 + noisePercent);
+            }
+        }
+        
+        augmentedData.push(baseSample);
+    }
+    
+    return augmentedData;
 };
 
 const applyPreprocessing = (data, params) => {
@@ -107,6 +142,98 @@ const applyPreprocessing = (data, params) => {
     return processedData;
 };
 
+// --- Custom Early Stopping Callback ---
+class AdaptiveEarlyStopping extends tf.Callback {
+    constructor(config) {
+        super();
+        this.monitor = config.monitor || 'val_loss';
+        this.originalDataSize = config.originalDataSize || 0;
+        
+        // Adjust patience based on dataset size
+        this.patience = this.originalDataSize < 30 ? 
+                        Math.min(10, EARLY_STOPPING_PATIENCE) : 
+                        EARLY_STOPPING_PATIENCE;
+                        
+        // Adjust minDelta based on dataset size - more lenient for smaller datasets
+        this.minDelta = this.originalDataSize < 20 ? 
+                        EARLY_STOPPING_MIN_DELTA * 2 : 
+                        EARLY_STOPPING_MIN_DELTA;
+                        
+        this.verbose = config.verbose || 1;
+        this.baseline = config.baseline;
+        this.restoreBestWeights = config.restoreBestWeights !== false;
+        
+        this.wait = 0;
+        this.stoppedEpoch = 0;
+        this.bestWeights = null;
+        this.bestValue = this.monitor.includes('loss') ? Infinity : -Infinity;
+        
+        logger.info(`Adaptive early stopping initialized: patience=${this.patience}, minDelta=${this.minDelta}, dataSize=${this.originalDataSize}`);
+    }
+
+    async onEpochEnd(epoch, logs) {
+        const current = logs[this.monitor];
+        
+        // Add better error handling for undefined/null/NaN values
+        if (current === undefined || current === null || isNaN(current)) {
+            const availableMetrics = Object.keys(logs).join(', ');
+            logger.warn(`Early stopping conditioned on metric ${this.monitor} which is not available or invalid (value: ${current}). Available metrics: ${availableMetrics}`);
+            return;
+        }
+
+        // Convert current to number in case it's a Tensor or other type
+        const currentNum = Number(current);
+        if (isNaN(currentNum)) {
+            logger.warn(`Could not convert current metric value to number: ${current}`);
+            return;
+        }
+
+        // Check if current is better than previous best
+        const improvedOverBaseline = this.baseline !== undefined && 
+            ((this.monitor.includes('loss') && currentNum < this.baseline) ||
+             (!this.monitor.includes('loss') && currentNum > this.baseline));
+            
+        const improved = (this.monitor.includes('loss') && currentNum < this.bestValue - this.minDelta) ||
+                         (!this.monitor.includes('loss') && currentNum > this.bestValue + this.minDelta);
+
+        // If we've improved, update best value and reset wait counter
+        if (improved || improvedOverBaseline) {
+            this.bestValue = currentNum;
+            this.wait = 0;
+            if (this.restoreBestWeights) {
+                this.bestWeights = this.model.getWeights().map(w => w.clone());
+            }
+            if (this.verbose > 0 && epoch % 5 === 0) {
+                logger.debug(`Epoch ${epoch + 1}: ${this.monitor} improved to ${currentNum.toFixed(4)}`);
+            }
+        } else {
+            this.wait++;
+            if (this.verbose > 0 && this.wait >= this.patience - 2) {
+                logger.debug(`Epoch ${epoch + 1}: ${this.monitor} = ${currentNum.toFixed(4)}, waiting ${this.wait}/${this.patience}`);
+            }
+            
+            if (this.wait >= this.patience) {
+                this.stoppedEpoch = epoch;
+                this.model.stopTraining = true;
+                logger.info(`Early stopping triggered at epoch ${epoch + 1} with best ${this.monitor} of ${this.bestValue.toFixed(4)}`);
+                
+                if (this.restoreBestWeights && this.bestWeights !== null) {
+                    logger.info('Restoring model weights from best epoch');
+                    this.model.setWeights(this.bestWeights);
+                }
+            }
+        }
+        
+        await tf.nextFrame(); // Prevent UI blocking
+    }
+
+    async onTrainEnd() {
+        if (this.stoppedEpoch > 0 && this.verbose > 0) {
+            logger.info(`Early stopping occurred at epoch ${this.stoppedEpoch + 1}`);
+        }
+    }
+}
+
 // --- Data Validation ---
 const validateMaintenanceRecord = (record, shipInfo) => {
     if (!shipInfo) {
@@ -145,7 +272,7 @@ const validateMaintenanceRecord = (record, shipInfo) => {
 
 // --- Main Pipeline Function ---
 export const runMaintenanceModelTrainingPipeline = async (jobData) => {
-    logger.info('Starting Maintenance Model Training Pipeline...');
+    logger.info('Starting Enhanced Maintenance Model Training Pipeline...');
     const results = {};
     const tensorsToDispose = [];
     let overallSuccess = false; // Track if at least one model succeeds
@@ -161,8 +288,8 @@ export const runMaintenanceModelTrainingPipeline = async (jobData) => {
         for (const maintenanceType of TARGET_MAINTENANCE_TYPES) {
             logger.info(`--- Training model for Maintenance Type: [${maintenanceType}] ---`);
             // Updated versioning for model and params filenames
-            const modelSavePath = `${MAINTENANCE_MODEL_SAVE_PATH_PREFIX}-${maintenanceType.replace(/\s+/g, '_')}-v2`;
-            const paramsSavePath = `${PREPROCESSING_PARAMS_PATH_PREFIX}-${maintenanceType.replace(/\s+/g, '_')}-v2.json`;
+            const modelSavePath = `${MAINTENANCE_MODEL_SAVE_PATH_PREFIX}-${maintenanceType.replace(/\s+/g, '_')}-v3`;
+            const paramsSavePath = `${PREPROCESSING_PARAMS_PATH_PREFIX}-${maintenanceType.replace(/\s+/g, '_')}-v3.json`;
 
             try {
                 // --- 1. Data Collection ---
@@ -283,16 +410,28 @@ export const runMaintenanceModelTrainingPipeline = async (jobData) => {
                 logger.info(`[${maintenanceType}] Validation failure summary: ${JSON.stringify(validationFailures)}`);
                 logger.info(`[${maintenanceType}] Valid intervals generated: ${combinedData.length}`);
                 
+                // Store original data size for adaptive early stopping
+                const originalDataSize = combinedData.length;
+                
                 if (combinedData.length < MIN_TRAINING_SAMPLES) {
-                    logger.warn(`[${maintenanceType}] Insufficient valid intervals (${combinedData.length} < ${MIN_TRAINING_SAMPLES}). Skipping training.`);
-                    results[maintenanceType] = {
-                        status: 'skipped',
-                        reason: 'insufficient_valid_intervals',
-                        count: combinedData.length,
-                        required: MIN_TRAINING_SAMPLES,
-                        validationFailures
-                    };
-                    continue;
+                    logger.warn(`[${maintenanceType}] Found only ${combinedData.length} valid intervals. Minimum required is ${MIN_TRAINING_SAMPLES}.`);
+                    
+                    if (combinedData.length >= 5) {
+                        // Try to train with data augmentation for very small datasets (at least 5 samples)
+                        logger.info(`[${maintenanceType}] Attempting to train with data augmentation for small dataset.`);
+                        combinedData = augmentData(combinedData, 0.5); // More aggressive augmentation for very small sets
+                        logger.info(`[${maintenanceType}] Dataset augmented to ${combinedData.length} samples.`);
+                    } else {
+                        logger.warn(`[${maintenanceType}] Too few samples (${combinedData.length} < 5) even for augmentation. Skipping training.`);
+                        results[maintenanceType] = {
+                            status: 'skipped',
+                            reason: 'insufficient_valid_intervals',
+                            count: combinedData.length,
+                            required: MIN_TRAINING_SAMPLES,
+                            validationFailures
+                        };
+                        continue;
+                    }
                 }
 
                 // --- 3. Preprocessing ---
@@ -338,7 +477,10 @@ export const runMaintenanceModelTrainingPipeline = async (jobData) => {
                 }
 
                 tf.util.shuffle(processedData);
-                const splitIndex = Math.floor(processedData.length * (1 - TEST_SET_RATIO));
+                
+                // Adjust test split for small datasets
+                const adjustedTestRatio = originalDataSize < 20 ? 0.1 : TEST_SET_RATIO;
+                const splitIndex = Math.floor(processedData.length * (1 - adjustedTestRatio));
                 const trainData = processedData.slice(0, splitIndex);
                 const testData = processedData.slice(splitIndex);
 
@@ -368,14 +510,38 @@ export const runMaintenanceModelTrainingPipeline = async (jobData) => {
                 const inputShape = [X_train.shape[1]]; // Get shape after creation
                 logger.info(`[${maintenanceType}] Data tensors created: Train ${X_train.shape[0]}, Test ${X_test.shape[0]}, Features ${inputShape[0]}`);
 
-                // --- 5. Model Definition ---
-                logger.info(`[${maintenanceType}] Creating model architecture...`);
+                // --- 5. Model Definition with Regularization ---
+                logger.info(`[${maintenanceType}] Creating model architecture with L1/L2 regularization...`);
                 const model = tf.sequential();
-                model.add(tf.layers.dense({ inputShape: inputShape, units: 64, activation: 'relu', kernelInitializer: 'heNormal' }));
+                
+                // First layer with L1 and L2 regularization
+                model.add(tf.layers.dense({
+                    inputShape: inputShape,
+                    units: 64,
+                    activation: 'relu',
+                    kernelInitializer: 'heNormal',
+                    kernelRegularizer: tf.regularizers.l1l2({
+                        l1: L1_REGULARIZATION,
+                        l2: L2_REGULARIZATION
+                    })
+                }));
+                
                 model.add(tf.layers.batchNormalization());
                 model.add(tf.layers.dropout({ rate: 0.2 }));
-                model.add(tf.layers.dense({ units: 32, activation: 'relu', kernelInitializer: 'heNormal' }));
-                model.add(tf.layers.dense({ units: 1 })); // Single output for regression
+                
+                // Second layer with L1 and L2 regularization
+                model.add(tf.layers.dense({
+                    units: 32,
+                    activation: 'relu',
+                    kernelInitializer: 'heNormal',
+                    kernelRegularizer: tf.regularizers.l1l2({
+                        l1: L1_REGULARIZATION,
+                        l2: L2_REGULARIZATION
+                    })
+                }));
+                
+                // Output layer (no activation for regression)
+                model.add(tf.layers.dense({ units: 1 }));
 
                 // --- 6. Model Compilation ---
                 logger.info(`[${maintenanceType}] Compiling model...`);
@@ -386,19 +552,23 @@ export const runMaintenanceModelTrainingPipeline = async (jobData) => {
                 });
                 model.summary(); // Log summary
 
-                // --- 7. Model Training ---
-                logger.info(`[${maintenanceType}] Starting training (Epochs: 100, Batch: 8)...`);
+                // --- 7. Model Training with Adaptive Early Stopping ---
+                // Adjust epochs based on dataset size
+                const epochs = originalDataSize < 20 ? 150 : 100; // More epochs for smaller datasets
+                const batchSize = Math.min(8, Math.max(4, Math.floor(trainData.length / 3))); // Adjust batch size for small datasets
+                
+                logger.info(`[${maintenanceType}] Starting training (Epochs: ${epochs}, Batch: ${batchSize})...`);
                 const history = await model.fit(X_train, y_train, {
-                    epochs: 100,
-                    batchSize: 8,
+                    epochs: epochs,
+                    batchSize: batchSize,
                     validationSplit: 0.15,
                     callbacks: [
-                        tf.callbacks.earlyStopping({
-                            monitor: 'val_loss',      // Monitor validation loss
-                            patience: 10,             // Stop if no improvement for 10 epochs
-                            minDelta: 100,            // Min change considered improvement
-                            // restoreBestWeights: true, // Restore weights from best epoch
-                            verbose: 1                // Log when stopping early
+                        // Custom adaptive early stopping
+                        new AdaptiveEarlyStopping({
+                            monitor: 'val_loss',
+                            originalDataSize: originalDataSize,
+                            verbose: 1,
+                            restoreBestWeights: true
                         }),
                         // Custom logger callback
                         new tf.CustomCallback({
@@ -434,7 +604,10 @@ export const runMaintenanceModelTrainingPipeline = async (jobData) => {
                     modelPath: modelSavePath,
                     testRMSE: testRMSE,
                     trainingSamples: trainData.length,
-                    testSamples: testData.length
+                    testSamples: testData.length,
+                    originalDataSize: originalDataSize,
+                    augmentedDataSize: combinedData.length,
+                    usedAugmentation: combinedData.length > originalDataSize
                 };
                 overallSuccess = true; // Mark that at least one model trained successfully
                 logger.info(`[${maintenanceType}] Training pipeline finished successfully.`);
@@ -468,7 +641,7 @@ export const runMaintenanceModelTrainingPipeline = async (jobData) => {
 
         // Check overall results after processing all types
         if (overallSuccess) {
-            logger.info('Maintenance Model Training Pipeline finished (at least partially successful).');
+            logger.info('Enhanced Maintenance Model Training Pipeline finished (at least partially successful).');
             return results;
         } else {
             // If all models were skipped due to data issues, return results but log a warning

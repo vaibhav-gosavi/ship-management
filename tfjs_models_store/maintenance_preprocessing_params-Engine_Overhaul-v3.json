@@ -1,0 +1,44 @@
+{
+  "numericalFeatures": [
+    "ship_buildYear",
+    "ship_capacity_weight",
+    "ship_engine_power"
+  ],
+  "categoricalFeatures": [
+    "ship_type"
+  ],
+  "targetVariable": "target_engineHoursInterval",
+  "imputation": {
+    "ship_buildYear": 2014,
+    "ship_capacity_weight": 22375,
+    "ship_engine_power": 23126
+  },
+  "scalers": {
+    "ship_buildYear": {
+      "mean": 2014.235294117647,
+      "stdDev": 5.9100664113722585
+    },
+    "ship_capacity_weight": {
+      "mean": 26523.764705882353,
+      "stdDev": 10633.930743064291
+    },
+    "ship_engine_power": {
+      "mean": 21779.41176470588,
+      "stdDev": 5521.4430847711365
+    }
+  },
+  "encoders": {
+    "ship_type": {
+      "categories": [
+        "Bulk Carrier",
+        "Cargo",
+        "Tanker"
+      ],
+      "mapping": {
+        "Bulk Carrier": 0,
+        "Cargo": 1,
+        "Tanker": 2
+      }
+    }
+  }
+}

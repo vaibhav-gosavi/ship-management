@@ -16,8 +16,8 @@ const FUEL_MODEL_LOAD_PATH = `file://${path.join(MODEL_OUTPUT_DIR, 'fuel-model',
 const FUEL_PREPROCESSING_PARAMS_PATH = path.join(MODEL_OUTPUT_DIR, 'fuel_preprocessing_params.json');
 // Maintenance Model Paths
 // To (simpler version):
-const MAINTENANCE_MODEL_PATH = `file://${path.join(MODEL_OUTPUT_DIR, 'maintenance-model-Engine_Overhaul-v2')}`;
-const MAINTENANCE_PARAMS_PATH = path.join(MODEL_OUTPUT_DIR, 'maintenance_preprocessing_params-Engine_Overhaul-v2.json');
+const MAINTENANCE_MODEL_PATH = `file://${path.join(MODEL_OUTPUT_DIR, 'maintenance-model-Engine_Overhaul-v3')}`;
+const MAINTENANCE_PARAMS_PATH = path.join(MODEL_OUTPUT_DIR, 'maintenance_preprocessing_params-Engine_Overhaul-v3.json');
 
 // --- Caching ---
 let loadedFuelModel = null;

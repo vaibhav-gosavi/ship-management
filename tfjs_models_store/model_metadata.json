@@ -1,0 +1,11 @@
+{
+  "originalDataSize": 46,
+  "augmentedDataSize": 46,
+  "architecture": [
+    32,
+    16
+  ],
+  "l2Strength": 0.02,
+  "dropoutRate": 0.3,
+  "uncertaintyEstimate": null
+}

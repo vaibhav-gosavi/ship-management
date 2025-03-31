@@ -12,8 +12,8 @@ import weatherService from './weatherService.js'; // Import weather service
 // --- Configuration ---
 const MODEL_OUTPUT_DIR = path.resolve(process.cwd(), 'tfjs_models_store');
 // Fuel Model Paths
-const FUEL_MODEL_LOAD_PATH = `file://${path.join(MODEL_OUTPUT_DIR, 'fuel-model-v2', 'model.json')}`;
-const FUEL_PREPROCESSING_PARAMS_PATH = path.join(MODEL_OUTPUT_DIR, 'fuel_preprocessing_params_v2.json');
+const FUEL_MODEL_LOAD_PATH = `file://${path.join(MODEL_OUTPUT_DIR, 'fuel-model', 'model.json')}`;
+const FUEL_PREPROCESSING_PARAMS_PATH = path.join(MODEL_OUTPUT_DIR, 'fuel_preprocessing_params.json');
 // Maintenance Model Paths
 // To (simpler version):
 const MAINTENANCE_MODEL_PATH = `file://${path.join(MODEL_OUTPUT_DIR, 'maintenance-model-Engine_Overhaul-v2')}`;

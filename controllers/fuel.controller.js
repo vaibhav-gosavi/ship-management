@@ -148,8 +148,10 @@ export const getFuelEstimate = async (req, res, next) => {
           departureLon: parseFloat(departureLon),
       };
 
-      const predictedFuel = await predictionService.predictFuelConsumption(finalShipId, routeDetails);
+      const predictedFuel_1 = await predictionService.predictFuelConsumption(finalShipId, routeDetails);
       
+      const predictedFuel = predictedFuel_1 * 1000;
+
       if (predictedFuel === null) {
           return res.status(404).json({ message: 'Ship not found or prediction failed' });
       }

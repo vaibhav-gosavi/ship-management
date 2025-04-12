@@ -37,10 +37,9 @@ const startApp = async () => {
         // Middleware Setup
         // ======================
         app.use(cors({
-             // Configure origins based on environment - '*' is insecure for production
-             origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : (process.env.NODE_ENV === 'production' ? false : '*'),
-             methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-             credentials: true // Allow cookies if needed for auth
+            origin: '*',
+            methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+            credentials: true
         }));
         app.use(express.json({ limit: '10kb' })); // Limit payload size
         app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
@@ -166,7 +165,7 @@ const startApp = async () => {
         // ======================
         // Server Startup
         // ======================
-        const PORT = process.env.PORT || 5001;
+        const PORT = process.env.PORT || 5000;
         serverInstance = app.listen(PORT, () => { // Assign to serverInstance
             logger.info(`
     🚢 Ship Management API Running

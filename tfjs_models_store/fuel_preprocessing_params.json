@@ -22,8 +22,8 @@
     "route_distance": 5852.5,
     "route_cargoWeight": 23777,
     "route_actual_duration_hours": 442.5,
-    "weather_wind_speed": 9.950863475661105,
-    "weather_temp": 16.915
+    "weather_wind_speed": 10.9146616,
+    "weather_temp": 4.805
   },
   "scalers": {
     "ship_buildYear": {
@@ -55,12 +55,12 @@
       "stdDev": 204.07093173596314
     },
     "weather_wind_speed": {
-      "mean": 10.965223780083582,
-      "stdDev": 6.204988596304494
+      "mean": 12.988231791304347,
+      "stdDev": 7.5930231163785775
     },
     "weather_temp": {
-      "mean": 6.0648820511223605,
-      "stdDev": 22.780676662757983
+      "mean": 0.9541304347826087,
+      "stdDev": 25.054614395450713
     }
   },
   "encoders": {

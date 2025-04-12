@@ -245,3 +245,59 @@ export const completeRoute = async (req, res) => {
 //     "predominantDirection": "NE"
 //   }
 // }
+
+export const listShips = async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      sort = 'name', 
+      order = 'asc',
+      type,
+      buildYearMin,
+      buildYearMax
+    } = req.query;
+
+    // Build query
+    const query = {};
+    if (type) query.type = type;
+    if (buildYearMin || buildYearMax) {
+      query.buildYear = {};
+      if (buildYearMin) query.buildYear.$gte = parseInt(buildYearMin);
+      if (buildYearMax) query.buildYear.$lte = parseInt(buildYearMax);
+    }
+
+    // Calculate skip for pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sort] = order === 'desc' ? -1 : 1;
+
+    // Execute query with pagination
+    const ships = await Ship.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Get total count for pagination
+    const totalShips = await Ship.countDocuments(query);
+
+    // Send response
+    res.status(200).json({
+      ships,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalShips / parseInt(limit)),
+        totalShips,
+        hasNextPage: skip + ships.length < totalShips,
+        hasPrevPage: parseInt(page) > 1
+      }
+    });
+
+  } catch (error) {
+    console.error('Error listing ships:', error);
+    res.status(500).json({ message: 'Server error while listing ships' });
+  }
+};

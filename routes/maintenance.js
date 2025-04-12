@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { 
     addMaintenance,
-    getMaintenanceSchedule 
+    getMaintenanceSchedule
 } from '../controllers/maintenance.controller.js';
 
 const router = Router();
